@@ -1,0 +1,13 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main(void) {
+    long long x1, y1, x2, y2;
+    if (scanf("%lld %lld %lld %lld", &x1, &y1, &x2, &y2) != 4) return 0;
+    long long dx = x2 - x1, dy = y2 - y1;
+    double dist = sqrt((double)dx * dx + (double)dy * dy);
+    printf("%.2f", dist);
+    return 0;
+}
