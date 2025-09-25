@@ -1,0 +1,15 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    int a, b;
+    if (scanf("%d %d", &a, &b) != 2) return 0;
+
+    double result = pow((double)a, (double)b);
+
+    // Print without decimal if it's an integer result
+    printf("%.0f\n", result);
+    return 0;
+}
