@@ -1,0 +1,15 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+int main(void){
+int a, b;
+if (scanf("%d %d", &a, &b) != 2) {
+return 1;
+}
+a ^= b;
+b ^= a;
+a ^= b;
+printf("%d %d\n", a, b);
+    return 0;
+}
