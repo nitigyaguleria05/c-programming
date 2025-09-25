@@ -1,0 +1,15 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    double P, R, T;
+    if (scanf("%lf %lf %lf", &P, &R, &T) != 3) return 0;
+
+    double si = (P * R * T) / 100.0;
+
+    // Print up to 2 decimal places
+    printf("%.2f\n", si);
+    return 0;
+}
