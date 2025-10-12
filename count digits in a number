@@ -1,0 +1,27 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    long long N;
+    if (scanf("%lld", &N) != 1) return 0;
+
+    if (N == 0) {
+        printf("1\n");
+        return 0;
+    }
+
+    unsigned long long x = (N < 0)
+        ? (unsigned long long)(-(N + 1)) + 1
+        : (unsigned long long)N;
+
+    int count = 0;
+    while (x > 0) {
+        count++;
+        x /= 10;
+    }
+
+    printf("%d\n", count);
+    return 0;
+}
