@@ -1,0 +1,33 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    long long N;
+    if (scanf("%lld", &N) != 1) return 0;
+    
+    unsigned long long x = (N < 0)
+        ? (unsigned long long)(-(N + 1)) + 1
+        : (unsigned long long)N;
+
+    if (x < 10) {
+        if (N < 0) putchar('-');
+        printf("%llu\n", x);
+        return 0;
+    }
+
+    unsigned long long pow10 = 1, t = x;
+    while (t >= 10) { t /= 10; pow10 *= 10; }
+    unsigned long long first = t;
+
+    unsigned long long rest = x % pow10;
+    unsigned long long last = rest % 10;
+    unsigned long long middle = rest / 10;
+
+    unsigned long long swapped = last * pow10 + middle * 10 + first;
+
+    if (N < 0) putchar('-');
+    printf("%llu\n", swapped);
+    return 0;
+}
