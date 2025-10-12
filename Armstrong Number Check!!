@@ -1,0 +1,40 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    long long N;
+    if (scanf("%lld", &N) != 1) return 0;
+
+    unsigned long long x = (N < 0)
+        ? (unsigned long long)(-(N + 1)) + 1
+        : (unsigned long long)N;
+
+    unsigned long long temp = x;
+    int digits = 0;
+    if (temp == 0) digits = 1;
+    while (temp > 0) {
+        digits++;
+        temp /= 10;
+    }
+
+    temp = x;
+    unsigned long long sum = 0;
+    while (temp > 0) {
+        int d = temp % 10;
+        unsigned long long power = 1;
+        for (int i = 0; i < digits; i++) {
+            power *= d;
+        }
+        sum += power;
+        temp /= 10;
+    }
+
+    if (sum == x)
+        printf("Armstrong\n");
+    else
+        printf("Not Armstrong\n");
+
+    return 0;
+}
