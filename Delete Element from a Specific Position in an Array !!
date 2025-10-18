@@ -1,0 +1,35 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    int N, Position;
+    scanf("%d", &N); // Read number of elements
+
+    int arr[N];
+    for (int i = 0; i < N; i++) {
+        scanf("%d", &arr[i]); // Read array elements
+    }
+
+    scanf("%d", &Position); // Read 1-based position to delete
+
+    // Check for valid position
+    if (Position < 1 || Position > N) {
+        printf("Invalid position\n");
+        return 0;
+    }
+
+    // Shift elements to the left from the deletion point
+    for (int i = Position - 1; i < N - 1; i++) {
+        arr[i] = arr[i + 1];
+    }
+
+    // Print updated array
+    for (int i = 0; i < N - 1; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
