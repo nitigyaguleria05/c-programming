@@ -1,0 +1,40 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    int N;
+    scanf("%d", &N);
+
+    int arr[N], unique[N], i, j, k = 0;
+    int found;
+
+    for (i = 0; i < N; i++) {
+        scanf("%d", &arr[i]);
+    }
+
+    for (i = 0; i < N; i++) {
+        found = 0;
+        for (j = 0; j < k; j++) {
+            if (arr[i] == unique[j]) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            unique[k++] = arr[i];
+        }
+    }
+
+    if (k == 0) {
+        printf("No elements left\n");
+    } else {
+        for (i = 0; i < k; i++) {
+            printf("%d ", unique[i]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
