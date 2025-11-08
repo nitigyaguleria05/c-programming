@@ -1,0 +1,28 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    char S[2001];
+    int i = 0, word_count = 0, in_word = 0;
+
+    fgets(S, sizeof(S), stdin);
+
+    while (S[i] != '\0') {
+        if (isalpha(S[i])) {
+            if (!in_word) {
+                word_count++;
+                in_word = 1;
+            }
+        } else {
+            in_word = 0;
+        }
+        i++;
+    }
+
+
+    printf("%d\n", word_count);
+
+    return 0;
+}
