@@ -1,0 +1,24 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    char S[1001];
+    int alphabets = 0, digits = 0, specials = 0;
+
+    fgets(S, sizeof(S), stdin);
+
+    for (int i = 0; S[i] != '\0'; i++) {
+        if (isalpha(S[i]))
+            alphabets++;
+        else if (isdigit(S[i]))
+            digits++;
+        else if (S[i] != '\n') 
+            specials++;
+    }
+    
+    printf("%d %d %d\n", alphabets, digits, specials);
+
+    return 0;
+}
