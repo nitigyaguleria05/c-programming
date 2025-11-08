@@ -1,0 +1,42 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    char S[1001], cleaned[1001];
+    int len = 0;
+
+
+    fgets(S, sizeof(S), stdin);
+
+    
+    size_t raw_len = strlen(S);
+    if (S[raw_len - 1] == '\n') {
+        S[raw_len - 1] = '\0';
+    }
+
+    
+    for (int i = 0; S[i] != '\0'; i++) {
+        if (!isspace(S[i])) {
+            cleaned[len++] = tolower(S[i]);
+        }
+    }
+
+    
+    int is_palindrome = 1;
+    for (int i = 0; i < len / 2; i++) {
+        if (cleaned[i] != cleaned[len - 1 - i]) {
+            is_palindrome = 0;
+            break;
+        }
+    }
+
+    
+    if (is_palindrome)
+        printf("Palindrome\n");
+    else
+        printf("Not Palindrome\n");
+
+    return 0;
+}
