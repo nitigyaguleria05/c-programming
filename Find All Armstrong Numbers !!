@@ -1,0 +1,52 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int count_digits(int x) {
+    int cnt = 0;
+    while (x > 0) {
+        cnt++;
+        x /= 10;
+    }
+    return cnt ? cnt : 1;
+}
+
+int int_pow(int base, int exp) {
+    int res = 1;
+    for (int i = 0; i < exp; ++i) res *= base;
+    return res;
+}
+
+int is_armstrong(int x) {
+    int orig = x;
+    int digits = count_digits(x);
+    int sum = 0;
+    while (x > 0) {
+        int d = x % 10;
+        sum += int_pow(d, digits);
+        x /= 10;
+    }
+    return sum == orig;
+}
+
+int main(void) {
+    int start, end;
+    if (scanf("%d %d", &start, &end) != 2) return 0;
+    if (start > end) {
+        int t = start; start = end; end = t;
+    }
+
+    int found = 0;
+    for (int i = start; i <= end; ++i) {
+        if (is_armstrong(i)) {
+            if (found) printf(" ");
+            printf("%d", i);
+            found = 1;
+        }
+    }
+
+    if (!found) printf("No Armstrong numbers found");
+    printf("\n");
+    return 0;
+}
