@@ -1,0 +1,22 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+long long reverseHelper(long long num, long long rev) {
+    if (num == 0) return rev;
+    return reverseHelper(num / 10, rev * 10 + (num % 10));
+}
+
+long long reverseNumber(long long num) {
+    if (num == 0) return 0;
+    return reverseHelper(num, 0);
+}
+
+int main(void) {
+    long long num;
+    if (scanf("%lld", &num) != 1) return 0;
+    if (num < 0) num = -num; /* constraints are non-negative, but handle just in case */
+    printf("%lld\n", reverseNumber(num));
+    return 0;
+}
