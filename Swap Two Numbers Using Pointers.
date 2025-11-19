@@ -1,0 +1,20 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+int main() {
+    long long a, b;
+    if (scanf("%lld %lld", &a, &b) != 2) return 0;
+
+    long long *pa = &a;
+    long long *pb = &b;
+
+    long long temp = *pa;
+    *pa = *pb;
+    *pb = temp;
+
+    printf("%lld %lld\n", a, b);
+    return 0;
+}
+ 
