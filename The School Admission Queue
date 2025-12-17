@@ -1,0 +1,35 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+struct Student {
+    char name[51];
+    int age;
+    char grade;
+};
+
+int main() {
+    int N;
+    if (scanf("%d", &N) != 1) return 0;
+
+    struct Student *students = malloc(sizeof(struct Student) * N);
+    if (!students) return 0;
+
+    for (int i = 0; i < N; ++i) {
+        scanf("%50s", students[i].name);
+        scanf("%d", &students[i].age);
+        scanf(" %c", &students[i].grade);
+    }
+
+    for (int i = 0; i < N; ++i) {
+        printf("Student %d:\n", i + 1);
+        printf("Name: %s\n", students[i].name);
+        printf("Age: %d\n", students[i].age);
+        printf("Grade: %c", students[i].grade);
+        if (i != N - 1) printf("\n");
+    }
+
+    free(students);
+    return 0;
+} 
