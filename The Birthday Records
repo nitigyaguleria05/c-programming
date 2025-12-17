@@ -1,0 +1,33 @@
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+struct Date {
+    int day;
+    int month;
+    int year;
+};
+
+struct Student {
+    char name[50];
+    struct Date dob;
+};
+
+int main() {
+    struct Student s;
+
+    if (fgets(s.name, sizeof(s.name), stdin) == NULL) return 0;
+    size_t len = strlen(s.name);
+    if (len > 0 && s.name[len-1] == '\n') s.name[len-1] = '\0';
+
+    if (scanf("%d", &s.dob.day) != 1) return 0;
+    if (scanf("%d", &s.dob.month) != 1) return 0;
+    if (scanf("%d", &s.dob.year) != 1) return 0;
+
+    printf("Name: %s\n", s.name);
+    printf("Date of Birth: %d/%d/%d", s.dob.day, s.dob.month, s.dob.year);
+
+    return 0;
+}    
+ 
