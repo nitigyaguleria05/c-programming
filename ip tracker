@@ -1,0 +1,611 @@
+(src/lib/ip.functions.ts — server functions & data model)
+import { createServerFn } from "@tanstack/react-start";
+
+export type IpInfo = {
+  ip: string;
+  type: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  countryCode: string | null;
+  flag: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  postal: string | null;
+  timezone: string | null;
+  utcOffset: string | null;
+  localTime: string | null;
+  isp: string | null;
+  org: string | null;
+  asn: string | null;
+};
+
+type WhoIsResponse = {
+  success?: boolean;
+  message?: string;
+  ip?: string;
+  type?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  country_code?: string;
+  latitude?: number;
+  longitude?: number;
+  postal?: string;
+  flag?: { emoji?: string };
+  connection?: { asn?: number; org?: string; isp?: string };
+  timezone?: { id?: string; utc?: string; current_time?: string };
+};
+
+function normalize(raw: WhoIsResponse): IpInfo {
+  return {
+    ip: raw.ip ?? "unknown",
+    type: raw.type ?? null,
+    city: raw.city ?? null,
+    region: raw.region ?? null,
+    country: raw.country ?? null,
+    countryCode: raw.country_code ?? null,
+    flag: raw.flag?.emoji ?? null,
+    latitude: typeof raw.latitude === "number" ? raw.latitude : null,
+    longitude: typeof raw.longitude === "number" ? raw.longitude : null,
+    postal: raw.postal ?? null,
+    timezone: raw.timezone?.id ?? null,
+    utcOffset: raw.timezone?.utc ?? null,
+    localTime: raw.timezone?.current_time ?? null,
+    isp: raw.connection?.isp ?? null,
+    org: raw.connection?.org ?? null,
+    asn: raw.connection?.asn ? `AS${raw.connection.asn}` : null,
+  };
+}
+
+async function lookup(ip?: string): Promise<{ data: IpInfo | null; error: string | null }> {
+  try {
+    const url = ip ? `https://ipwho.is/${encodeURIComponent(ip)}` : "https://ipwho.is/";
+    const res = await fetch(url, { headers: { accept: "application/json" } });
+    if (!res.ok) return { data: null, error: "Lookup service unavailable" };
+    const raw = (await res.json()) as WhoIsResponse;
+    if (raw.success === false) {
+      return { data: null, error: raw.message ?? "That IP address could not be found" };
+    }
+    return { data: normalize(raw), error: null };
+  } catch {
+    return { data: null, error: "Lookup service unavailable" };
+  }
+}
+
+/** Geolocate the visitor's own public IP (resolved from request headers). */
+export const getMyIp = createServerFn({ method: "GET" }).handler(async () => {
+  const { getRequestHeader } = await import("@tanstack/react-start/server");
+  const forwarded = getRequestHeader("x-forwarded-for") ?? "";
+  const candidate =
+    forwarded.split(",")[0]?.trim() ||
+    getRequestHeader("cf-connecting-ip") ||
+    getRequestHeader("x-real-ip") ||
+    "";
+  const isPrivate =
+    !candidate ||
+    candidate.startsWith("127.") ||
+    candidate.startsWith("10.") ||
+    candidate.startsWith("192.168.") ||
+    candidate === "::1";
+  return lookup(isPrivate ? undefined : candidate);
+});
+
+/** Geolocate any IP address or hostname. */
+export const lookupIp = createServerFn({ method: "POST" })
+  .inputValidator((input: { query: string }) => ({ query: String(input.query ?? "").trim() }))
+  .handler(async ({ data }) => {
+    if (!data.query) return { data: null, error: "Enter an IP address or domain" };
+    if (data.query.length > 253) return { data: null, error: "That input is too long" };
+    return lookup(data.query);
+  });        
+
+
+
+(src/routes/index.tsx — the page UI)
+import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { Globe, MapPin, Search, Signal, Wifi, Clock, Hash, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { getMyIp, lookupIp, type IpInfo } from "@/lib/ip.functions";
+
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "IP Tracker — Trace Any IP Address Location" },
+      {
+        name: "description",
+        content:
+          "Instantly see your own public IP address and trace any IP or domain: city, country, ISP, ASN, timezone and coordinates.",
+      },
+      { property: "og:title", content: "IP Tracker — Trace Any IP Address Location" },
+      {
+        property: "og:description",
+        content:
+          "See your public IP and geolocate any IP or domain: city, country, ISP, ASN, timezone and coordinates.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: Index,
+});
+
+function Field({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | null;
+}) {
+  return (
+    <div className="panel p-4">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
+        <Icon className="h-3.5 w-3.5 text-primary" />
+        {label}
+      </div>
+      <p className="mt-2 truncate text-sm text-foreground" title={value ?? undefined}>
+        {value ?? "—"}
+      </p>
+    </div>
+  );
+}
+
+function Report({ info }: { info: IpInfo }) {
+  const location = [info.city, info.region, info.country].filter(Boolean).join(", ") || null;
+  const coords =
+    info.latitude !== null && info.longitude !== null
+      ? `${info.latitude.toFixed(4)}, ${info.longitude.toFixed(4)}`
+      : null;
+
+  return (
+    <section className="space-y-4">
+      <div className="panel glow relative overflow-hidden p-6 sm:p-8">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full border border-primary/30">
+          <div className="radar-sweep h-full w-full origin-center rounded-full bg-[conic-gradient(from_0deg,transparent_0%,var(--signal)_12%,transparent_20%)] opacity-20" />
+        </div>
+        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Target address</p>
+        <h2 className="mt-2 font-mono text-3xl font-semibold text-primary sm:text-4xl">{info.ip}</h2>
+        <p className="mt-3 flex items-center gap-2 text-sm text-foreground">
+          <span className="text-lg leading-none">{info.flag ?? "🌐"}</span>
+          {location ?? "Location unavailable"}
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Field icon={Wifi} label="ISP" value={info.isp} />
+        <Field icon={Signal} label="Organization" value={info.org} />
+        <Field icon={Hash} label="ASN" value={info.asn} />
+        <Field icon={MapPin} label="Coordinates" value={coords} />
+        <Field icon={Clock} label="Timezone" value={info.timezone} />
+        <Field icon={Clock} label="Local time" value={info.localTime} />
+        <Field icon={Globe} label="IP version" value={info.type} />
+        <Field icon={MapPin} label="Postal code" value={info.postal} />
+        <Field icon={Globe} label="Country code" value={info.countryCode} />
+      </div>
+
+      {coords && (
+        <a
+          className="inline-flex items-center gap-2 text-sm text-primary underline-offset-4 hover:underline"
+          href={`https://www.openstreetmap.org/?mlat=${info.latitude}&mlon=${info.longitude}#map=10/${info.latitude}/${info.longitude}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <MapPin className="h-4 w-4" /> View approximate location on map
+        </a>
+      )}
+    </section>
+  );
+}
+
+function Index() {
+  const [query, setQuery] = useState("");
+  const lookup = useServerFn(lookupIp);
+
+  const mine = useQuery({
+    queryKey: ["my-ip"],
+    queryFn: () => getMyIp(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const search = useMutation({
+    mutationFn: (value: string) => lookup({ data: { query: value } }),
+  });
+
+  const result = search.data?.data ?? (search.isPending ? null : mine.data?.data ?? null);
+  const error = search.data?.error ?? (search.isError ? "Lookup failed" : mine.data?.error ?? null);
+  const loading = mine.isLoading || search.isPending;
+
+  return (
+    <main className="mx-auto w-full max-w-5xl px-5 py-14 sm:py-20">
+      <header className="mb-10">
+        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-primary">
+          <Signal className="h-3.5 w-3.5" /> live trace
+        </p>
+        <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">IP Tracker</h1>
+        <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
+          Your public IP is detected automatically. Enter any other IP address or domain to trace its
+          network, location and timezone.
+        </p>
+      </header>
+
+      <form
+        className="mb-10 flex flex-col gap-3 sm:flex-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (query.trim()) search.mutate(query.trim());
+        }}
+      >
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="8.8.8.8 or example.com"
+          aria-label="IP address or domain"
+          className="h-12 font-mono text-base"
+        />
+        <Button type="submit" size="lg" className="h-12 gap-2" disabled={search.isPending}>
+          {search.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Search className="h-4 w-4" />
+          )}
+          Trace
+        </Button>
+      </form>
+
+      {loading && !result && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Tracing…
+        </p>
+      )}
+
+      {error && !result && (
+        <p className="panel border-destructive/50 p-4 text-sm text-destructive">{error}</p>
+      )}
+
+      {result && <Report info={result} />}
+      {result && error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+    </main>
+  );
+}
+
+
+
+
+(src/styles.css — the "signal trace" dark-radar design system)
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system: "signal trace" — dark radar console with cyan/lime signal accents.
+ * All colors are oklch semantic tokens. Never hardcode colors in components.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-signal: var(--signal);
+  --color-surface: var(--surface);
+  --color-grid: var(--grid);
+  --shadow-glow: var(--shadow-glow);
+  --shadow-panel: var(--shadow-panel);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.16 0.028 250);
+  --foreground: oklch(0.96 0.008 230);
+  --surface: oklch(0.21 0.031 250);
+  --card: oklch(0.21 0.031 250);
+  --card-foreground: oklch(0.96 0.008 230);
+  --popover: oklch(0.21 0.031 250);
+  --popover-foreground: oklch(0.96 0.008 230);
+  --primary: oklch(0.82 0.16 178);
+  --primary-foreground: oklch(0.18 0.04 220);
+  --secondary: oklch(0.27 0.035 250);
+  --secondary-foreground: oklch(0.94 0.01 230);
+  --muted: oklch(0.25 0.03 250);
+  --muted-foreground: oklch(0.71 0.028 240);
+  --accent: oklch(0.86 0.19 128);
+  --accent-foreground: oklch(0.19 0.04 150);
+  --destructive: oklch(0.65 0.21 22);
+  --destructive-foreground: oklch(0.98 0.005 250);
+  --border: oklch(0.32 0.032 250);
+  --input: oklch(0.28 0.032 250);
+  --ring: oklch(0.82 0.16 178);
+  --signal: oklch(0.82 0.16 178);
+  --grid: oklch(0.82 0.16 178 / 8%);
+  --shadow-glow: 0 0 0 1px oklch(0.82 0.16 178 / 25%), 0 0 40px oklch(0.82 0.16 178 / 12%);
+  --shadow-panel: 0 24px 60px -30px oklch(0.05 0.02 250 / 80%);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-mono);
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+}
+
+@utility panel {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-panel);
+}
+
+@utility glow {
+  box-shadow: var(--shadow-glow);
+}
+
+@keyframes radar-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+}
+
+
+
+
+(src/routes/__root.tsx — root layout, fonts & providers)
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  Outlet,
+  Link,
+  createRootRouteWithContext,
+  useRouter,
+  HeadContent,
+  Scripts,
+} from "@tanstack/react-router";
+import { useEffect, type ReactNode } from "react";
+
+import appCss from "../styles.css?url";
+import { reportLovableError } from "../lib/lovable-error-reporting";
+
+function NotFoundComponent() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-7xl font-bold text-foreground">404</h1>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+        <div className="mt-6">
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Go home
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  console.error(error);
+  const router = useRouter();
+  useEffect(() => {
+    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+  }, [error]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          This page didn't load
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Something went wrong on our end. You can try refreshing or head back home.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Try again
+          </button>
+          <a
+            href="/"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            Go home
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  head: () => ({
+    meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: "Lovable App" },
+      { name: "description", content: "Lovable Generated Project" },
+      { name: "author", content: "Lovable" },
+      { property: "og:title", content: "Lovable App" },
+      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: "@Lovable" },
+    ],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap",
+      },
+    ],
+  }),
+  shellComponent: RootShell,
+  component: RootComponent,
+  notFoundComponent: NotFoundComponent,
+  errorComponent: ErrorComponent,
+});
+
+function RootShell({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Outlet />
+    </QueryClientProvider>
+  );
+}
+
+
+
+
+
+
+(add trace history)
+
+python3 - <<'EOF'
+import re
+p='src/routes/index.tsx'; s=open(p).read()
+s=s.replace('''import { useState } from "react";
+import { Globe, MapPin, Search, Signal, Wifi, Clock, Hash, Loader2 } from "lucide-react";''','''import { useEffect, useState } from "react";
+import { Globe, MapPin, Search, Signal, Wifi, Clock, Hash, Loader2, History, Trash2 } from "lucide-react";''')
+s=s.replace('''import { getMyIp, lookupIp, type IpInfo } from "@/lib/ip.functions";''','''import { getMyIp, lookupIp, type IpInfo } from "@/lib/ip.functions";
+import { useLookupHistory } from "@/lib/use-lookup-history";''')
+
+s=s.replace('''function Index() {
+  const [query, setQuery] = useState("");''','''function Index() {
+  const [query, setQuery] = useState("");
+  const { history, addEntry, clear } = useLookupHistory();''')
+
+s=s.replace('''  const loading = mine.isLoading || search.isPending;''','''  const loading = mine.isLoading || search.isPending;
+
+  useEffect(() => {
+    if (result) addEntry(result);
+  }, [result?.ip, addEntry]);
+
+  const trace = (value: string) => {
+    const v = value.trim();
+    if (v) search.mutate(v);
+  };''')
+
+s=s.replace('''          if (query.trim()) search.mutate(query.trim());''','''          trace(query);''')
+
+s=s.replace('''      {result && <Report info={result} />}
+      {result && error && <p className="mt-4 text-sm text-destructive">{error}</p>}''','''      {result && <Report info={result} />}
+      {result && error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+      {history.length > 0 && (
+        <section className="mt-12">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              <History className="h-3.5 w-3.5 text-primary" /> Trace history
+            </h2>
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" onClick={clear}>
+              <Trash2 className="h-3.5 w-3.5" /> Clear
+            </Button>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {history.map((entry) => (
+              <li key={entry.ip}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery(entry.ip);
+                    trace(entry.ip);
+                  }}
+                  className="panel w-full p-4 text-left transition-colors hover:border-primary/60"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-mono text-sm text-primary">{entry.ip}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(entry.tracedAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    <span className="mr-1">{entry.flag ?? "\\ud83c\\udf10"}</span>
+                    {[entry.location, entry.isp].filter(Boolean).join(" • ") || "Unknown location"}
+                  </p>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}''')
+open(p,'w').write(s)
+EOF
+rg -n "useLookupHistory|trace\(query\)|Trace history" src/routes/index.tsx
+
+    
